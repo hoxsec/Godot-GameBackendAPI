@@ -19,6 +19,10 @@
   <a href="#-deployment">Deployment</a>
 </p>
 
+> ⚠️ **This is the backend server.** You need both repositories to build a complete solution:
+> - **Backend API**: [Godot-GameBackendAPI](https://github.com/hoxsec/Godot-GameBackendAPI) (server-side - this repo)
+> - **Godot SDK**: [Godot-GameBackendSDK](https://github.com/hoxsec/Godot-GameBackendSDK) (client-side)
+
 ---
 
 ## ✨ Features
@@ -43,12 +47,13 @@
 ### Prerequisites
 
 - [Bun](https://bun.sh/) v1.0+
+- [Godot-GameBackendSDK](https://github.com/hoxsec/Godot-GameBackendSDK) (for testing with Godot)
 
 ### Installation
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/GameBackendAPI.git
-cd GameBackendAPI
+git clone https://github.com/hoxsec/Godot-GameBackendAPI.git
+cd Godot-GameBackendAPI
 bun install
 ```
 
@@ -59,6 +64,13 @@ bun dev
 ```
 
 The server starts at `http://localhost:3000`
+
+### Testing with Godot
+
+1. Make sure this backend server is running
+2. Install the [Godot-GameBackendSDK](https://github.com/hoxsec/Godot-GameBackendSDK) in your Godot project
+3. Initialize the SDK with `http://localhost:3000` as the base URL
+4. Test all features using the demo scene included in the SDK
 
 ### Production
 
@@ -393,6 +405,7 @@ This project is licensed under the **MIT License** - see the [LICENSE](../LICENS
 
 ## 💬 Support
 
+- 🔗 [Godot SDK Repository](https://github.com/hoxsec/Godot-GameBackendSDK)
 - 🐛 [Report Issues](https://github.com/hoxsec/Godot-GameBackendAPI/issues)
 - 💡 [Request Features](https://github.com/hoxsec/Godot-GameBackendAPI/issues)
 
