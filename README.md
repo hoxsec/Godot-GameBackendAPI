@@ -4,6 +4,10 @@
   <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="MIT License">
 </p>
 
+<p align="center">
+  <img src="Godot-GameBackendAPI-Logo.png" alt="Logo" width="300" />
+</p>
+
 <h1 align="center">🖥️ GameBackendAPI</h1>
 
 <p align="center">
