@@ -1,0 +1,30 @@
+{
+  "name": "gamebackend-api",
+  "version": "1.0.0",
+  "description": "Reference backend for GameBackendSDK",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --hot server.js",
+    "start": "bun server.js",
+    "test:db": "bun test-database.js",
+    "db:stats": "bun db-tools.js stats",
+    "db:clear": "bun db-tools.js clear",
+    "db:reset": "bun db-tools.js reset",
+    "db:export": "bun db-tools.js export"
+  },
+  "keywords": [
+    "gamebackend",
+    "api",
+    "godot"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "ws": "^8.16.0"
+  }
+}

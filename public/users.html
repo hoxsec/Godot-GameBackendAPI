@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Users - GameBackend Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/admin.css">
+  <link rel="stylesheet" href="/css/modal.css">
+</head>
+<body>
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <main class="main-content">
+    <div class="header">
+      <h1>Users</h1>
+      <div class="header-actions">
+        <div class="user-badge">
+          <span>Logged in as</span>
+          <strong id="adminName">admin</strong>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3>User Management</h3>
+        <div class="search-bar" style="margin: 0; width: 300px;">
+          <input type="text" class="search-input" id="userSearch" placeholder="Search users...">
+        </div>
+      </div>
+      <div class="card-body" style="padding: 0;">
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>User ID</th>
+                <th>Email</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="usersTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- User Detail Modal -->
+  <div class="modal-overlay" id="userModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>👤 User Details</h2>
+        <button class="modal-close" onclick="closeUserModal()">×</button>
+      </div>
+      <div class="modal-body" id="userModalBody"></div>
+    </div>
+  </div>
+
+  <script src="/js/admin-core.js"></script>
+  <script>
+    async function loadUsers(search = '') {
+      try {
+        const params = search ? `?search=${encodeURIComponent(search)}` : '';
+        const data = await api(`/admin/users${params}`);
+        const tbody = document.getElementById('usersTable');
+        
+        if (!data.users.length) {
+          tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No users found</td></tr>';
+          return;
+        }
+        
+        tbody.innerHTML = data.users.map(u => `
+          <tr>
+            <td class="mono"><span class="clickable-id" onclick="viewUser('${u.id}')">${u.id}</span></td>
+            <td>${u.email || '<span style="color: var(--text-muted)">-</span>'}</td>
+            <td><span class="badge ${u.type === 'registered' ? 'badge-blue' : 'badge-purple'}">${u.type}</span></td>
+            <td><span class="badge ${u.banned ? 'badge-red' : 'badge-green'}">${u.banned ? 'Banned' : 'Active'}</span></td>
+            <td class="mono">${formatDate(u.created_at)}</td>
+            <td>
+              <button class="btn btn-sm badge-blue" onclick="viewUser('${u.id}')">View</button>
+              <button class="btn btn-sm ${u.banned ? 'badge-green' : 'badge-orange'}" onclick="toggleBan('${u.id}', ${!u.banned})">${u.banned ? 'Unban' : 'Ban'}</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteUser('${u.id}')">Delete</button>
+            </td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        console.error('Failed to load users:', err);
+      }
+    }
+
+    async function toggleBan(userId, banned) {
+      try {
+        await api(`/admin/users/${userId}/ban`, {
+          method: 'PATCH',
+          body: JSON.stringify({ banned })
+        });
+        loadUsers(document.getElementById('userSearch').value);
+      } catch (err) {
+        alert('Failed to update ban status: ' + err.message);
+      }
+    }
+
+    async function deleteUser(userId) {
+      if (!confirm('Delete this user? This will also delete all their data.')) return;
+      try {
+        await api(`/admin/users/${userId}`, { method: 'DELETE' });
+        loadUsers(document.getElementById('userSearch').value);
+        closeUserModal();
+      } catch (err) {
+        alert('Failed to delete user: ' + err.message);
+      }
+    }
+
+    async function viewUser(userId) {
+      const modal = document.getElementById('userModal');
+      const body = document.getElementById('userModalBody');
+      
+      body.innerHTML = '<div class="empty-state">Loading...</div>';
+      modal.classList.add('active');
+      
+      try {
+        const data = await api(`/admin/users/${userId}`);
+        const u = data.user;
+        
+        body.innerHTML = `
+          <div class="user-detail-header">
+            <div class="user-avatar">${u.type === 'guest' ? '👤' : '👨‍💻'}</div>
+            <div class="user-info">
+              <h3>${u.id}</h3>
+              <div class="user-meta">
+                <span class="user-meta-item">
+                  <span class="badge ${u.type === 'registered' ? 'badge-blue' : 'badge-purple'}">${u.type}</span>
+                </span>
+                <span class="user-meta-item">
+                  <span class="badge ${u.banned ? 'badge-red' : 'badge-green'}">${u.banned ? '🚫 Banned' : '✓ Active'}</span>
+                </span>
+                ${u.email ? `<span class="user-meta-item">📧 ${u.email}</span>` : ''}
+                <span class="user-meta-item">📅 Created: ${formatDateTime(u.created_at)}</span>
+              </div>
+              <div class="user-actions">
+                <button class="btn btn-sm ${u.banned ? 'badge-green' : 'badge-orange'}" onclick="toggleBanFromModal('${u.id}', ${!u.banned})">${u.banned ? '✓ Unban User' : '🚫 Ban User'}</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteUser('${u.id}')">🗑️ Delete User</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="stats-mini">
+            <div class="stat-mini">
+              <div class="stat-mini-value">${data.stats.kv_count}</div>
+              <div class="stat-mini-label">KV Entries</div>
+            </div>
+            <div class="stat-mini">
+              <div class="stat-mini-value">${data.stats.leaderboard_count}</div>
+              <div class="stat-mini-label">Leaderboards</div>
+            </div>
+          </div>
+
+          ${data.kv_entries.length ? `
+            <div class="detail-section">
+              <div class="detail-section-header">
+                <h4>🗄️ KV Store Entries</h4>
+                <span class="detail-section-count">${data.kv_entries.length} entries</span>
+              </div>
+              <table class="detail-table">
+                <thead><tr><th>Key</th><th>Value</th><th>Version</th><th>Updated</th></tr></thead>
+                <tbody>
+                  ${data.kv_entries.map(kv => `
+                    <tr>
+                      <td class="mono">${kv.key}</td>
+                      <td><div class="json-viewer" style="max-height: 100px; font-size: 11px;">${formatJSON(kv.value)}</div></td>
+                      <td class="mono">v${kv.version}</td>
+                      <td class="mono">${formatDateTime(kv.updated_at)}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          ` : ''}
+
+          ${data.leaderboard_entries.length ? `
+            <div class="detail-section">
+              <div class="detail-section-header">
+                <h4>🏆 Leaderboard Entries</h4>
+                <span class="detail-section-count">${data.leaderboard_entries.length} boards</span>
+              </div>
+              <table class="detail-table">
+                <thead><tr><th>Board</th><th>Score</th><th>Rank</th><th>Submitted</th></tr></thead>
+                <tbody>
+                  ${data.leaderboard_entries.map(lb => `
+                    <tr>
+                      <td class="mono">${lb.board}</td>
+                      <td class="mono">${lb.score}</td>
+                      <td><span class="badge badge-orange">#${lb.rank}</span></td>
+                      <td class="mono">${formatDateTime(lb.submitted_at)}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          ` : ''}
+
+          ${!data.kv_entries.length && !data.leaderboard_entries.length ? `
+            <div class="empty-state">
+              <div class="empty-state-icon">📭</div>
+              <p>This user has no stored data yet</p>
+            </div>
+          ` : ''}
+        `;
+      } catch (err) {
+        body.innerHTML = `<div class="empty-state" style="color: var(--accent-red);">Failed to load user: ${err.message}</div>`;
+      }
+    }
+
+    async function toggleBanFromModal(userId, banned) {
+      try {
+        await api(`/admin/users/${userId}/ban`, {
+          method: 'PATCH',
+          body: JSON.stringify({ banned })
+        });
+        viewUser(userId);
+        loadUsers(document.getElementById('userSearch').value);
+      } catch (err) {
+        alert('Failed to update ban status: ' + err.message);
+      }
+    }
+
+    function closeUserModal() {
+      document.getElementById('userModal').classList.remove('active');
+    }
+
+    document.getElementById('userModal').addEventListener('click', (e) => {
+      if (e.target.id === 'userModal') closeUserModal();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeUserModal();
+    });
+
+    document.getElementById('userSearch').addEventListener('input', (e) => {
+      loadUsers(e.target.value);
+    });
+
+    // Initialize
+    (async () => {
+      const admin = await initPage('users');
+      if (!admin) return;
+      
+      document.getElementById('sidebar').innerHTML = getSidebarHTML('users');
+      loadUsers();
+    })();
+  </script>
+</body>
+</html>
+

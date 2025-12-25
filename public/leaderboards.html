@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leaderboards - GameBackend Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <main class="main-content">
+    <div class="header">
+      <h1>Leaderboards</h1>
+      <div class="header-actions">
+        <div class="user-badge">
+          <span>Logged in as</span>
+          <strong id="adminName">admin</strong>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3>Leaderboards Overview</h3>
+      </div>
+      <div class="card-body" style="padding: 0;">
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Board Name</th>
+                <th>Entries</th>
+                <th>Top Score</th>
+                <th>Min Score</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboardsTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="boardDetailsCard" style="display: none;">
+      <div class="card-header">
+        <h3>Board: <span id="selectedBoard"></span></h3>
+        <button class="btn btn-sm" onclick="closeBoardDetails()">Close</button>
+      </div>
+      <div class="card-body" style="padding: 0;">
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>User ID</th>
+                <th>Score</th>
+                <th>Submitted</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="boardEntriesTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/admin-core.js"></script>
+  <script>
+    async function loadLeaderboards() {
+      try {
+        const data = await api('/admin/leaderboards');
+        const tbody = document.getElementById('leaderboardsTable');
+        
+        if (!data.boards.length) {
+          tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No leaderboards found</td></tr>';
+          return;
+        }
+        
+        tbody.innerHTML = data.boards.map(b => `
+          <tr>
+            <td class="mono">${b.board}</td>
+            <td>${b.entries}</td>
+            <td class="mono">${b.top_score}</td>
+            <td class="mono">${b.min_score}</td>
+            <td>
+              <button class="btn btn-sm badge-blue" onclick="viewBoard('${b.board}')">View</button>
+              <button class="btn btn-sm btn-danger" onclick="clearBoard('${b.board}')">Clear</button>
+            </td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        console.error('Failed to load leaderboards:', err);
+      }
+    }
+
+    async function viewBoard(board) {
+      try {
+        const data = await api(`/admin/leaderboards/${board}`);
+        document.getElementById('selectedBoard').textContent = board;
+        document.getElementById('boardDetailsCard').style.display = 'block';
+        
+        const tbody = document.getElementById('boardEntriesTable');
+        tbody.innerHTML = data.entries.map(e => `
+          <tr>
+            <td><span class="badge badge-orange">#${e.rank}</span></td>
+            <td class="mono">${e.user_id}</td>
+            <td class="mono">${e.score}</td>
+            <td class="mono">${formatDateTime(e.submitted_at)}</td>
+            <td>
+              <button class="btn btn-sm btn-danger" onclick="deleteScore('${board}', ${e.id})">Delete</button>
+            </td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        console.error('Failed to load board:', err);
+      }
+    }
+
+    function closeBoardDetails() {
+      document.getElementById('boardDetailsCard').style.display = 'none';
+    }
+
+    async function clearBoard(board) {
+      if (!confirm(`Clear all entries from "${board}"?`)) return;
+      try {
+        await api(`/admin/leaderboards/${board}`, { method: 'DELETE' });
+        loadLeaderboards();
+        closeBoardDetails();
+      } catch (err) {
+        alert('Failed to clear board: ' + err.message);
+      }
+    }
+
+    async function deleteScore(board, id) {
+      if (!confirm('Delete this score entry?')) return;
+      try {
+        await api(`/admin/leaderboards/${board}/${id}`, { method: 'DELETE' });
+        viewBoard(board);
+      } catch (err) {
+        alert('Failed to delete score: ' + err.message);
+      }
+    }
+
+    // Initialize
+    (async () => {
+      const admin = await initPage('leaderboards');
+      if (!admin) return;
+      
+      document.getElementById('sidebar').innerHTML = getSidebarHTML('leaderboards');
+      loadLeaderboards();
+    })();
+  </script>
+</body>
+</html>
+

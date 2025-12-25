@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - GameBackend Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/admin.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    .ws-status {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-left: 8px;
+      transition: all 0.3s ease;
+    }
+    .ws-status.connected {
+      background: #3fb950;
+      box-shadow: 0 0 8px rgba(63, 185, 80, 0.6);
+    }
+    .ws-status.disconnected {
+      background: #f85149;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <main class="main-content">
+    <div class="header">
+      <h1>Dashboard</h1>
+      <div class="header-actions">
+        <div class="user-badge">
+          <span>Logged in as</span>
+          <strong id="adminName">admin</strong>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+      </div>
+    </div>
+
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-card green">
+        <div class="stat-value" id="stat-users">-</div>
+        <div class="stat-label">Total Users</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-registered">-</div>
+        <div class="stat-label">Registered</div>
+      </div>
+      <div class="stat-card purple">
+        <div class="stat-value" id="stat-guests">-</div>
+        <div class="stat-label">Guests</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="stat-value" id="stat-banned">-</div>
+        <div class="stat-label">Banned</div>
+      </div>
+      <div class="stat-card cyan">
+        <div class="stat-value" id="stat-kv">-</div>
+        <div class="stat-label">KV Entries</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-value" id="stat-scores">-</div>
+        <div class="stat-label">Scores</div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">
+          <span>📈</span>
+          Requests Per Second
+          <span id="ws-status" class="ws-status disconnected" title="Connecting..."></span>
+        </div>
+        <div class="chart-filters">
+          <button class="chart-filter-btn" data-window="1">1m</button>
+          <button class="chart-filter-btn active" data-window="5">5m</button>
+          <button class="chart-filter-btn" data-window="15">15m</button>
+          <button class="chart-filter-btn" data-window="60">1h</button>
+        </div>
+      </div>
+      <div class="chart-body">
+        <canvas id="rpsChart"></canvas>
+      </div>
+      <div class="chart-stats">
+        <div class="chart-stat">
+          <span class="chart-stat-value current" id="rps-current">0</span>
+          <span class="chart-stat-label">Current RPS</span>
+        </div>
+        <div class="chart-stat">
+          <span class="chart-stat-value" id="rps-avg">0</span>
+          <span class="chart-stat-label">Average</span>
+        </div>
+        <div class="chart-stat">
+          <span class="chart-stat-value peak" id="rps-peak">0</span>
+          <span class="chart-stat-label">Peak</span>
+        </div>
+        <div class="chart-stat">
+          <span class="chart-stat-value" id="rps-total">0</span>
+          <span class="chart-stat-label">Total Requests</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3>📡 Recent Requests</h3>
+      </div>
+      <div class="card-body" style="padding: 0;">
+        <div class="console-body" id="recentConsole" style="height: 250px;"></div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/admin-core.js"></script>
+  <script src="/js/charts.js"></script>
+  <script>
+    async function loadStats() {
+      try {
+        const data = await api('/admin/stats');
+        document.getElementById('stat-users').textContent = data.users.total;
+        document.getElementById('stat-registered').textContent = data.users.registered;
+        document.getElementById('stat-guests').textContent = data.users.guests;
+        document.getElementById('stat-banned').textContent = data.users.banned;
+        document.getElementById('stat-kv').textContent = data.kv_entries;
+        document.getElementById('stat-scores').textContent = data.scores;
+      } catch (err) {
+        console.error('Failed to load stats:', err);
+      }
+    }
+
+    function renderRequest(req, container) {
+      const div = document.createElement('div');
+      div.className = `console-line ${getStatusClass(req.status)}`;
+      div.innerHTML = `
+        <span class="console-time">${formatTime(req.timestamp)}</span>
+        <span class="console-method ${getMethodClass(req.method)}">${req.method}</span>
+        <span class="console-path">${req.path}</span>
+        <span class="console-status">${req.status}</span>
+        <span class="console-duration">${req.duration}ms</span>
+      `;
+      container.insertBefore(div, container.firstChild);
+      while (container.children.length > 100) {
+        container.removeChild(container.lastChild);
+      }
+    }
+
+    async function loadRecentRequests() {
+      try {
+        const data = await api('/admin/requests');
+        const container = document.getElementById('recentConsole');
+        container.innerHTML = '';
+        data.requests.slice().reverse().forEach(req => renderRequest(req, container));
+      } catch (err) {
+        console.error('Failed to load requests:', err);
+      }
+    }
+
+    // Initialize
+    (async () => {
+      const admin = await initPage('dashboard');
+      if (!admin) return;
+      
+      document.getElementById('sidebar').innerHTML = getSidebarHTML('dashboard');
+      
+      loadStats();
+      loadRecentRequests();
+      initRpsChart('rpsChart');
+      
+      // Register WebSocket callback for live requests
+      onRequest((req) => {
+        const container = document.getElementById('recentConsole');
+        renderRequest(req, container);
+      });
+      
+      // Start WebSocket connection (replaces polling)
+      startRpsPolling();
+      
+      // Still poll stats periodically (lightweight)
+      setInterval(loadStats, 10000);
+    })();
+
+    window.addEventListener('beforeunload', () => {
+      stopRpsPolling();
+    });
+  </script>
+</body>
+</html>
+

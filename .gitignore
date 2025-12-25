@@ -1,0 +1,39 @@
+# Godot
+.godot/
+*.import
+export_presets.cfg
+
+# Backend
+back-end/node_modules/
+back-end/.env
+back-end/game.db
+back-end/game.db-journal
+back-end/game.db-wal
+back-end/game.db-shm
+
+# Bun
+back-end/bun.lockb
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# Logs
+*.log
+npm-debug.log*
+
+# Build outputs
+dist/
+build/
+
+# Temporary files
+*.tmp
+*.temp
+

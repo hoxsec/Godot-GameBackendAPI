@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Console - GameBackend Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/admin.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    .ws-status {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-left: 8px;
+      transition: all 0.3s ease;
+    }
+    .ws-status.connected {
+      background: #3fb950;
+      box-shadow: 0 0 8px rgba(63, 185, 80, 0.6);
+    }
+    .ws-status.disconnected {
+      background: #f85149;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <main class="main-content">
+    <div class="header">
+      <h1>Live Console <span id="ws-status" class="ws-status disconnected" title="Connecting..."></span></h1>
+      <div class="header-actions">
+        <div class="user-badge">
+          <span>Logged in as</span>
+          <strong id="adminName">admin</strong>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">
+          <span>📈</span>
+          Requests Per Second
+        </div>
+        <div class="chart-filters">
+          <button class="chart-filter-btn" data-window="1">1m</button>
+          <button class="chart-filter-btn active" data-window="5">5m</button>
+          <button class="chart-filter-btn" data-window="15">15m</button>
+          <button class="chart-filter-btn" data-window="60">1h</button>
+        </div>
+      </div>
+      <div class="chart-body">
+        <canvas id="rpsChart"></canvas>
+      </div>
+      <div class="chart-stats">
+        <div class="chart-stat">
+          <span class="chart-stat-value current" id="rps-current">0</span>
+          <span class="chart-stat-label">Current RPS</span>
+        </div>
+        <div class="chart-stat">
+          <span class="chart-stat-value" id="rps-avg">0</span>
+          <span class="chart-stat-label">Average</span>
+        </div>
+        <div class="chart-stat">
+          <span class="chart-stat-value peak" id="rps-peak">0</span>
+          <span class="chart-stat-label">Peak</span>
+        </div>
+        <div class="chart-stat">
+          <span class="chart-stat-value" id="rps-total">0</span>
+          <span class="chart-stat-label">Total Requests</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="console">
+      <div class="console-header">
+        <div class="console-title">
+          <div class="console-dot"></div>
+          Live Request Stream
+        </div>
+        <button class="btn btn-sm" onclick="clearConsole()">Clear</button>
+      </div>
+      <div class="console-body" id="liveConsole" style="height: 500px;"></div>
+    </div>
+  </main>
+
+  <script src="/js/admin-core.js"></script>
+  <script src="/js/charts.js"></script>
+  <script>
+    function renderRequest(req, container) {
+      const div = document.createElement('div');
+      div.className = `console-line ${getStatusClass(req.status)}`;
+      div.innerHTML = `
+        <span class="console-time">${formatTime(req.timestamp)}</span>
+        <span class="console-method ${getMethodClass(req.method)}">${req.method}</span>
+        <span class="console-path">${req.path}</span>
+        <span class="console-status">${req.status}</span>
+        <span class="console-duration">${req.duration}ms</span>
+      `;
+      container.insertBefore(div, container.firstChild);
+      while (container.children.length > 200) {
+        container.removeChild(container.lastChild);
+      }
+    }
+
+    async function loadRecentRequests() {
+      try {
+        const data = await api('/admin/requests');
+        const container = document.getElementById('liveConsole');
+        container.innerHTML = '';
+        data.requests.slice().reverse().forEach(req => renderRequest(req, container));
+      } catch (err) {
+        console.error('Failed to load requests:', err);
+      }
+    }
+
+    function clearConsole() {
+      document.getElementById('liveConsole').innerHTML = '';
+    }
+
+    // Initialize
+    (async () => {
+      const admin = await initPage('console');
+      if (!admin) return;
+      
+      document.getElementById('sidebar').innerHTML = getSidebarHTML('console');
+      
+      loadRecentRequests();
+      initRpsChart('rpsChart');
+      
+      // Register WebSocket callback for live requests
+      onRequest((req) => {
+        const container = document.getElementById('liveConsole');
+        renderRequest(req, container);
+      });
+      
+      // Start WebSocket connection (replaces polling)
+      startRpsPolling();
+    })();
+
+    window.addEventListener('beforeunload', () => {
+      stopRpsPolling();
+    });
+  </script>
+</body>
+</html>
+

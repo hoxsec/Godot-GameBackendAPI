@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KV Store - GameBackend Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <main class="main-content">
+    <div class="header">
+      <h1>KV Store</h1>
+      <div class="header-actions">
+        <div class="user-badge">
+          <span>Logged in as</span>
+          <strong id="adminName">admin</strong>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3>Key-Value Store</h3>
+        <div class="search-bar" style="margin: 0; width: 300px;">
+          <input type="text" class="search-input" id="kvSearch" placeholder="Filter by user ID...">
+        </div>
+      </div>
+      <div class="card-body" style="padding: 0;">
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>User ID</th>
+                <th>Key</th>
+                <th>Value</th>
+                <th>Version</th>
+                <th>Updated</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="kvTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/admin-core.js"></script>
+  <script>
+    async function loadKV(userId = '') {
+      try {
+        const params = userId ? `?user_id=${encodeURIComponent(userId)}` : '';
+        const data = await api(`/admin/kv${params}`);
+        const tbody = document.getElementById('kvTable');
+        
+        if (!data.entries.length) {
+          tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No KV entries found</td></tr>';
+          return;
+        }
+        
+        tbody.innerHTML = data.entries.map(e => `
+          <tr>
+            <td class="mono">${e.user_id}</td>
+            <td class="mono">${e.key}</td>
+            <td><div class="json-viewer">${formatJSON(e.value)}</div></td>
+            <td class="mono">v${e.version}</td>
+            <td class="mono">${formatDateTime(e.updated_at)}</td>
+            <td>
+              <button class="btn btn-sm btn-danger" onclick="deleteKV('${e.user_id}', '${e.key}')">Delete</button>
+            </td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        console.error('Failed to load KV:', err);
+      }
+    }
+
+    async function deleteKV(userId, key) {
+      if (!confirm('Delete this KV entry?')) return;
+      try {
+        await api(`/admin/kv/${userId}/${key}`, { method: 'DELETE' });
+        loadKV(document.getElementById('kvSearch').value);
+      } catch (err) {
+        alert('Failed to delete KV: ' + err.message);
+      }
+    }
+
+    document.getElementById('kvSearch').addEventListener('input', (e) => {
+      loadKV(e.target.value);
+    });
+
+    // Initialize
+    (async () => {
+      const admin = await initPage('kv');
+      if (!admin) return;
+      
+      document.getElementById('sidebar').innerHTML = getSidebarHTML('kv');
+      loadKV();
+    })();
+  </script>
+</body>
+</html>
+

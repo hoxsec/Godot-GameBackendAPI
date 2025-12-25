@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API Endpoints - GameBackend Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/admin.css">
+  <link rel="stylesheet" href="/css/api-tester.css">
+  <link rel="stylesheet" href="/css/modal.css">
+  <style>
+    .api-code-btn {
+      padding: 10px 20px;
+      background: linear-gradient(135deg, var(--accent-purple), #8b5cf6);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .api-code-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+    }
+    .code-modal {
+      max-width: 800px;
+    }
+    .code-modal-body {
+      padding: 0;
+    }
+    .code-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      background: var(--bg-tertiary);
+      border-bottom: 1px solid var(--border);
+    }
+    .code-lang {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .code-lang-icon {
+      width: 24px;
+      height: 24px;
+    }
+    .code-copy-btn {
+      padding: 8px 16px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .code-copy-btn:hover {
+      border-color: var(--accent-green);
+      color: var(--accent-green);
+    }
+    .code-copy-btn.copied {
+      background: rgba(63, 185, 80, 0.1);
+      border-color: var(--accent-green);
+      color: var(--accent-green);
+    }
+    .code-content {
+      padding: 20px;
+      background: var(--bg-primary);
+      overflow: auto;
+      max-height: 500px;
+    }
+    .code-content pre {
+      margin: 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text-primary);
+    }
+    .code-content .comment { color: var(--text-muted); }
+    .code-content .keyword { color: var(--accent-purple); }
+    .code-content .string { color: var(--accent-green); }
+    .code-content .function { color: var(--accent-blue); }
+    .code-content .number { color: var(--accent-orange); }
+    .code-content .variable { color: var(--accent-cyan); }
+  </style>
+</head>
+<body>
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <main class="main-content">
+    <div class="header">
+      <h1>API Endpoints</h1>
+      <div class="header-actions">
+        <div class="user-badge">
+          <span>Logged in as</span>
+          <strong id="adminName">admin</strong>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+      </div>
+    </div>
+
+    <div class="api-tester">
+      <!-- Endpoint Sidebar -->
+      <div class="api-sidebar">
+        <div class="api-sidebar-header">
+          <input type="text" class="api-sidebar-search" id="apiEndpointSearch" placeholder="Search endpoints...">
+        </div>
+        <div class="api-endpoint-list" id="apiEndpointList"></div>
+      </div>
+
+      <!-- Main Request/Response Area -->
+      <div class="api-main">
+        <!-- Request Panel -->
+        <div class="api-request-panel">
+          <div class="api-request-header">
+            <select class="api-method-select" id="apiMethod">
+              <option value="GET">GET</option>
+              <option value="POST">POST</option>
+              <option value="PUT">PUT</option>
+              <option value="PATCH">PATCH</option>
+              <option value="DELETE">DELETE</option>
+            </select>
+            <input type="text" class="api-url-input" id="apiUrl" placeholder="/v1/auth/guest">
+            <label class="api-auth-toggle" id="apiAuthToggle">
+              <input type="checkbox" id="apiUseAuth">
+              <span class="api-auth-indicator"></span>
+              <span class="api-auth-label">Use Auth Token</span>
+            </label>
+            <button class="api-send-btn" id="apiSendBtn" onclick="sendApiRequest()">
+              <span>▶</span> Send
+            </button>
+            <button class="api-code-btn" onclick="showCodeModal()">
+              <span>{ }</span> Code
+            </button>
+          </div>
+          <div class="api-tabs">
+            <button class="api-tab active" data-tab="params">Query Params</button>
+            <button class="api-tab" data-tab="headers">Headers</button>
+            <button class="api-tab" data-tab="body">Body</button>
+          </div>
+          <div class="api-tab-content active" id="tab-params">
+            <table class="api-params-table">
+              <thead>
+                <tr>
+                  <th style="width: 40px;"></th>
+                  <th>Key</th>
+                  <th>Value</th>
+                </tr>
+              </thead>
+              <tbody id="apiParamsBody"></tbody>
+            </table>
+            <button class="api-add-param" onclick="addParamRow('apiParamsBody')">+ Add Parameter</button>
+          </div>
+          <div class="api-tab-content" id="tab-headers">
+            <table class="api-params-table">
+              <thead>
+                <tr>
+                  <th style="width: 40px;"></th>
+                  <th>Key</th>
+                  <th>Value</th>
+                </tr>
+              </thead>
+              <tbody id="apiHeadersBody"></tbody>
+            </table>
+            <button class="api-add-param" onclick="addParamRow('apiHeadersBody')">+ Add Header</button>
+          </div>
+          <div class="api-tab-content" id="tab-body">
+            <textarea class="api-body-editor" id="apiBodyEditor" placeholder='{"key": "value"}'></textarea>
+          </div>
+        </div>
+
+        <!-- Response Panel -->
+        <div class="api-response-panel">
+          <div class="api-response-header">
+            <div class="api-response-title">
+              <span>📥</span> Response
+            </div>
+            <div class="api-response-status" id="apiResponseStatus" style="display: none;">
+              <span class="api-status-code" id="apiStatusCode">200</span>
+              <span class="api-response-time" id="apiResponseTime">0ms</span>
+              <span class="api-response-size" id="apiResponseSize">0 B</span>
+            </div>
+          </div>
+          <div class="api-tabs" id="apiResponseTabs" style="display: none;">
+            <button class="api-tab active" data-tab="response-body">Body</button>
+            <button class="api-tab" data-tab="response-headers">Headers</button>
+          </div>
+          <div class="api-response-body" id="apiResponseBody">
+            <div class="api-response-empty">
+              <div class="api-response-empty-icon">🚀</div>
+              <p>Select an endpoint or enter a URL and click Send</p>
+            </div>
+          </div>
+          <div class="api-response-body" id="apiResponseHeaders" style="display: none;"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Code Modal -->
+  <div class="modal-overlay" id="codeModal">
+    <div class="modal code-modal">
+      <div class="modal-header">
+        <h2>{ } GDScript Code</h2>
+        <button class="modal-close" onclick="closeCodeModal()">×</button>
+      </div>
+      <div class="modal-body code-modal-body">
+        <div class="code-header">
+          <div class="code-lang">
+            <svg class="code-lang-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 2.824a9.176 9.176 0 110 18.352 9.176 9.176 0 010-18.352zm-1.074 3.25L6.228 12l4.698 5.926h2.148L8.376 12l4.698-5.926zm4 0L10.228 12l4.698 5.926h2.148L12.376 12l4.698-5.926z"/>
+            </svg>
+            GDScript
+          </div>
+          <button class="code-copy-btn" id="codeCopyBtn" onclick="copyCode()">
+            <span>📋</span> Copy Code
+          </button>
+        </div>
+        <div class="code-content">
+          <pre id="codeOutput"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/admin-core.js"></script>
+  <script>
+    let apiEndpoints = [];
+    let gameUserToken = null;
+
+    async function loadEndpoints() {
+      try {
+        const data = await api('/admin/endpoints');
+        apiEndpoints = data.endpoints;
+        renderEndpointList();
+      } catch (err) {
+        console.error('Failed to load endpoints:', err);
+      }
+    }
+
+    function renderEndpointList(filter = '') {
+      const container = document.getElementById('apiEndpointList');
+      const filtered = filter 
+        ? apiEndpoints.filter(ep => 
+            ep.path.toLowerCase().includes(filter.toLowerCase()) || 
+            ep.description.toLowerCase().includes(filter.toLowerCase()))
+        : apiEndpoints;
+
+      container.innerHTML = filtered.map((ep, idx) => `
+        <div class="api-endpoint-item" data-index="${apiEndpoints.indexOf(ep)}" onclick="selectEndpoint(${apiEndpoints.indexOf(ep)})">
+          <span class="endpoint-method ${getMethodClass(ep.method)}">${ep.method}</span>
+          <div class="endpoint-info">
+            <div class="endpoint-path">${ep.path}</div>
+            <div class="endpoint-desc">${ep.description}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function selectEndpoint(index) {
+      const ep = apiEndpoints[index];
+      if (!ep) return;
+
+      document.querySelectorAll('.api-endpoint-item').forEach(el => el.classList.remove('active'));
+      document.querySelector(`.api-endpoint-item[data-index="${index}"]`)?.classList.add('active');
+
+      document.getElementById('apiMethod').value = ep.method;
+      document.getElementById('apiUrl').value = ep.path;
+
+      const authToggle = document.getElementById('apiAuthToggle');
+      const authCheckbox = document.getElementById('apiUseAuth');
+      if (ep.auth) {
+        authCheckbox.checked = true;
+        authToggle.classList.add('active');
+      }
+
+      document.getElementById('apiParamsBody').innerHTML = '';
+      document.getElementById('apiHeadersBody').innerHTML = '';
+      document.getElementById('apiBodyEditor').value = '';
+
+      prefillEndpointData(ep);
+    }
+
+    function prefillEndpointData(ep) {
+      const bodyEditor = document.getElementById('apiBodyEditor');
+      
+      if (['POST', 'PUT', 'PATCH'].includes(ep.method)) {
+        switch (ep.path) {
+          case '/v1/auth/register':
+            bodyEditor.value = JSON.stringify({ email: "test@example.com", password: "password123" }, null, 2);
+            break;
+          case '/v1/auth/login':
+            bodyEditor.value = JSON.stringify({ email: "test@example.com", password: "password123" }, null, 2);
+            break;
+          case '/v1/auth/refresh':
+            bodyEditor.value = JSON.stringify({ refresh_token: "<refresh_token>" }, null, 2);
+            break;
+          case '/v1/kv/:key':
+            document.getElementById('apiUrl').value = '/v1/kv/mykey';
+            bodyEditor.value = JSON.stringify({ value: { score: 100, level: 5 } }, null, 2);
+            break;
+          case '/v1/leaderboards/:board/submit':
+            document.getElementById('apiUrl').value = '/v1/leaderboards/highscores/submit';
+            bodyEditor.value = JSON.stringify({ score: 1000 }, null, 2);
+            break;
+        }
+        switchApiTab('body');
+      }
+
+      if (ep.path.includes(':key')) {
+        document.getElementById('apiUrl').value = ep.path.replace(':key', 'mykey');
+      }
+      if (ep.path.includes(':board')) {
+        document.getElementById('apiUrl').value = ep.path.replace(':board', 'highscores');
+      }
+
+      if (ep.method === 'GET' && ep.path === '/v1/config') {
+        addParamRow('apiParamsBody', 'platform', 'windows');
+        addParamRow('apiParamsBody', 'app_version', '1.0.0');
+      }
+      if (ep.path.includes('/top')) {
+        addParamRow('apiParamsBody', 'limit', '10');
+      }
+    }
+
+    function addParamRow(containerId, key = '', value = '') {
+      const tbody = document.getElementById(containerId);
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td><button class="remove-param" onclick="this.closest('tr').remove()">×</button></td>
+        <td><input type="text" placeholder="key" value="${key}"></td>
+        <td><input type="text" placeholder="value" value="${value}"></td>
+      `;
+      tbody.appendChild(row);
+    }
+
+    function getParamsFromTable(containerId) {
+      const tbody = document.getElementById(containerId);
+      const params = {};
+      tbody.querySelectorAll('tr').forEach(row => {
+        const inputs = row.querySelectorAll('input');
+        if (inputs[0]?.value && inputs[1]?.value) {
+          params[inputs[0].value] = inputs[1].value;
+        }
+      });
+      return params;
+    }
+
+    function switchApiTab(tabName) {
+      document.querySelectorAll('.api-request-panel .api-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.api-tab-content').forEach(c => c.classList.remove('active'));
+      document.querySelector(`.api-request-panel .api-tab[data-tab="${tabName}"]`)?.classList.add('active');
+      document.getElementById(`tab-${tabName}`)?.classList.add('active');
+    }
+
+    function switchResponseTab(tabName) {
+      document.querySelectorAll('#apiResponseTabs .api-tab').forEach(t => t.classList.remove('active'));
+      document.querySelector(`#apiResponseTabs .api-tab[data-tab="${tabName}"]`)?.classList.add('active');
+      
+      document.getElementById('apiResponseBody').style.display = tabName === 'response-body' ? 'block' : 'none';
+      document.getElementById('apiResponseHeaders').style.display = tabName === 'response-headers' ? 'block' : 'none';
+    }
+
+    document.querySelectorAll('.api-request-panel .api-tab').forEach(tab => {
+      tab.addEventListener('click', () => switchApiTab(tab.dataset.tab));
+    });
+
+    document.getElementById('apiResponseTabs')?.addEventListener('click', (e) => {
+      if (e.target.classList.contains('api-tab')) {
+        switchResponseTab(e.target.dataset.tab);
+      }
+    });
+
+    document.getElementById('apiAuthToggle')?.addEventListener('click', function() {
+      const checkbox = document.getElementById('apiUseAuth');
+      checkbox.checked = !checkbox.checked;
+      this.classList.toggle('active', checkbox.checked);
+    });
+
+    document.getElementById('apiEndpointSearch')?.addEventListener('input', (e) => {
+      renderEndpointList(e.target.value);
+    });
+
+    async function sendApiRequest() {
+      const method = document.getElementById('apiMethod').value;
+      let url = document.getElementById('apiUrl').value;
+      const useAuth = document.getElementById('apiUseAuth').checked;
+      const bodyEditor = document.getElementById('apiBodyEditor');
+      
+      const sendBtn = document.getElementById('apiSendBtn');
+      sendBtn.disabled = true;
+      sendBtn.innerHTML = '<span>⏳</span> Sending...';
+
+      const queryParams = getParamsFromTable('apiParamsBody');
+      if (Object.keys(queryParams).length > 0) {
+        const searchParams = new URLSearchParams(queryParams);
+        url += (url.includes('?') ? '&' : '?') + searchParams.toString();
+      }
+
+      const headers = { 'Content-Type': 'application/json' };
+      const customHeaders = getParamsFromTable('apiHeadersBody');
+      Object.assign(headers, customHeaders);
+
+      if (useAuth && gameUserToken) {
+        headers['Authorization'] = `Bearer ${gameUserToken}`;
+      }
+
+      const options = { method, headers };
+      if (['POST', 'PUT', 'PATCH'].includes(method) && bodyEditor.value.trim()) {
+        options.body = bodyEditor.value;
+      }
+
+      const startTime = performance.now();
+
+      try {
+        const res = await fetch(`${API_BASE}${url}`, options);
+        const endTime = performance.now();
+        const duration = Math.round(endTime - startTime);
+        
+        const responseHeaders = {};
+        res.headers.forEach((value, key) => {
+          responseHeaders[key] = value;
+        });
+
+        let responseData;
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          responseData = await res.json();
+        } else {
+          responseData = await res.text();
+        }
+
+        const responseText = typeof responseData === 'string' ? responseData : JSON.stringify(responseData);
+        const size = new Blob([responseText]).size;
+
+        if (responseData.access_token) {
+          gameUserToken = responseData.access_token;
+          console.log('🔑 Token saved for future requests');
+        }
+
+        displayResponse(res.status, duration, size, responseData, responseHeaders);
+
+      } catch (err) {
+        const endTime = performance.now();
+        const duration = Math.round(endTime - startTime);
+        displayResponse(0, duration, 0, { error: err.message }, {});
+      }
+
+      sendBtn.disabled = false;
+      sendBtn.innerHTML = '<span>▶</span> Send';
+    }
+
+    function displayResponse(status, duration, size, data, headers) {
+      document.getElementById('apiResponseStatus').style.display = 'flex';
+      document.getElementById('apiResponseTabs').style.display = 'flex';
+
+      const statusEl = document.getElementById('apiStatusCode');
+      statusEl.textContent = status || 'ERR';
+      statusEl.className = 'api-status-code';
+      if (status >= 200 && status < 300) statusEl.classList.add('success');
+      else if (status >= 300 && status < 400) statusEl.classList.add('redirect');
+      else if (status >= 400 && status < 500) statusEl.classList.add('client-error');
+      else statusEl.classList.add('server-error');
+
+      document.getElementById('apiResponseTime').textContent = `${duration}ms`;
+      document.getElementById('apiResponseSize').textContent = formatBytes(size);
+
+      const bodyEl = document.getElementById('apiResponseBody');
+      const formattedJson = typeof data === 'object' 
+        ? JSON.stringify(data, null, 2) 
+        : data;
+      
+      bodyEl.innerHTML = `<pre>${syntaxHighlight(formattedJson)}</pre>`;
+
+      const headersEl = document.getElementById('apiResponseHeaders');
+      headersEl.innerHTML = `<pre>${syntaxHighlight(JSON.stringify(headers, null, 2))}</pre>`;
+    }
+
+    // Code Modal Functions
+    function showCodeModal() {
+      const method = document.getElementById('apiMethod').value;
+      const url = document.getElementById('apiUrl').value;
+      const useAuth = document.getElementById('apiUseAuth').checked;
+      const bodyEditor = document.getElementById('apiBodyEditor').value;
+      const queryParams = getParamsFromTable('apiParamsBody');
+      
+      const code = generateGDScriptCode(method, url, useAuth, bodyEditor, queryParams);
+      document.getElementById('codeOutput').innerHTML = highlightGDScript(code);
+      document.getElementById('codeModal').classList.add('active');
+      document.getElementById('codeCopyBtn').classList.remove('copied');
+      document.getElementById('codeCopyBtn').innerHTML = '<span>📋</span> Copy Code';
+    }
+
+    function closeCodeModal() {
+      document.getElementById('codeModal').classList.remove('active');
+    }
+
+    function copyCode() {
+      const code = document.getElementById('codeOutput').textContent;
+      navigator.clipboard.writeText(code).then(() => {
+        const btn = document.getElementById('codeCopyBtn');
+        btn.classList.add('copied');
+        btn.innerHTML = '<span>✓</span> Copied!';
+        setTimeout(() => {
+          btn.classList.remove('copied');
+          btn.innerHTML = '<span>📋</span> Copy Code';
+        }, 2000);
+      });
+    }
+
+    document.getElementById('codeModal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'codeModal') closeCodeModal();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeCodeModal();
+    });
+
+    function generateGDScriptCode(method, url, useAuth, body, queryParams) {
+      // Build query string if params exist
+      let fullUrl = url;
+      if (Object.keys(queryParams).length > 0) {
+        const params = Object.entries(queryParams)
+          .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+          .join('&');
+        fullUrl += (url.includes('?') ? '&' : '?') + params;
+      }
+
+      // Determine the appropriate Backend method based on endpoint
+      let code = '';
+      
+      // Helper to parse body JSON
+      let bodyDict = '';
+      if (body && body.trim()) {
+        try {
+          const parsed = JSON.parse(body);
+          bodyDict = jsonToGDScript(parsed, 1);
+        } catch {
+          bodyDict = '{}';
+        }
+      }
+
+      // Generate code based on endpoint pattern
+      if (url === '/v1/auth/guest') {
+        code = generateGuestAuthCode();
+      } else if (url === '/v1/auth/register') {
+        code = generateRegisterCode(body);
+      } else if (url === '/v1/auth/login') {
+        code = generateLoginCode(body);
+      } else if (url === '/v1/auth/refresh') {
+        code = generateRefreshCode();
+      } else if (url === '/v1/auth/logout') {
+        code = generateLogoutCode();
+      } else if (url.startsWith('/v1/kv/') && method === 'GET') {
+        const key = url.replace('/v1/kv/', '');
+        code = generateKVGetCode(key);
+      } else if (url.startsWith('/v1/kv/') && method === 'PUT') {
+        const key = url.replace('/v1/kv/', '');
+        code = generateKVSetCode(key, body);
+      } else if (url.startsWith('/v1/kv/') && method === 'DELETE') {
+        const key = url.replace('/v1/kv/', '');
+        code = generateKVDeleteCode(key);
+      } else if (url.includes('/leaderboards/') && url.includes('/submit')) {
+        const board = url.match(/\/leaderboards\/([^/]+)\/submit/)?.[1] || 'board_name';
+        code = generateLeaderboardSubmitCode(board, body);
+      } else if (url.includes('/leaderboards/') && url.includes('/top')) {
+        const board = url.match(/\/leaderboards\/([^/]+)\/top/)?.[1] || 'board_name';
+        code = generateLeaderboardTopCode(board, queryParams.limit || 20);
+      } else if (url.includes('/leaderboards/') && url.includes('/me')) {
+        const board = url.match(/\/leaderboards\/([^/]+)\/me/)?.[1] || 'board_name';
+        code = generateLeaderboardMeCode(board);
+      } else if (url === '/v1/config') {
+        code = generateConfigCode(queryParams);
+      } else if (url === '/health') {
+        code = generateHealthCode();
+      } else {
+        // Generic request code
+        code = generateGenericCode(method, fullUrl, useAuth, bodyDict);
+      }
+
+      return code;
+    }
+
+    function jsonToGDScript(obj, indent = 0) {
+      const spaces = '\t'.repeat(indent);
+      if (obj === null) return 'null';
+      if (typeof obj === 'boolean') return obj ? 'true' : 'false';
+      if (typeof obj === 'number') return String(obj);
+      if (typeof obj === 'string') return `"${obj.replace(/"/g, '\\"')}"`;
+      if (Array.isArray(obj)) {
+        if (obj.length === 0) return '[]';
+        const items = obj.map(item => jsonToGDScript(item, indent + 1));
+        return `[${items.join(', ')}]`;
+      }
+      if (typeof obj === 'object') {
+        const entries = Object.entries(obj);
+        if (entries.length === 0) return '{}';
+        const items = entries.map(([k, v]) => `"${k}": ${jsonToGDScript(v, indent + 1)}`);
+        return `{${items.join(', ')}}`;
+      }
+      return String(obj);
+    }
+
+    function generateGuestAuthCode() {
+      return `# Create a guest session
+# This creates an anonymous user that can be upgraded later
+
+func _on_login_as_guest():
+\tvar result = await Backend.auth_guest()
+\t
+\tif result.ok:
+\t\tprint("Guest login successful!")
+\t\tprint("User ID: ", result.data.user_id)
+\t\t# Tokens are automatically stored by the SDK
+\telse:
+\t\tprint("Guest login failed: ", result.error)`;
+    }
+
+    function generateRegisterCode(body) {
+      let email = 'user@example.com';
+      let password = 'password123';
+      try {
+        const parsed = JSON.parse(body);
+        email = parsed.email || email;
+        password = parsed.password || password;
+      } catch {}
+      
+      return `# Register a new user account
+# This creates a permanent account with email/password
+
+func _on_register_pressed():
+\tvar email = "${email}"
+\tvar password = "${password}"
+\t
+\tvar result = await Backend.auth_register(email, password)
+\t
+\tif result.ok:
+\t\tprint("Registration successful!")
+\t\tprint("User ID: ", result.data.user_id)
+\t\t# User is automatically logged in after registration
+\telse:
+\t\tprint("Registration failed: ", result.error)
+\t\t# Common errors: email already exists, invalid email format`;
+    }
+
+    function generateLoginCode(body) {
+      let email = 'user@example.com';
+      let password = 'password123';
+      try {
+        const parsed = JSON.parse(body);
+        email = parsed.email || email;
+        password = parsed.password || password;
+      } catch {}
+      
+      return `# Login with email and password
+# Returns access token and refresh token
+
+func _on_login_pressed():
+\tvar email = "${email}"
+\tvar password = "${password}"
+\t
+\tvar result = await Backend.auth_login(email, password)
+\t
+\tif result.ok:
+\t\tprint("Login successful!")
+\t\tprint("User ID: ", result.data.user_id)
+\t\t# Tokens are automatically stored by the SDK
+\telse:
+\t\tprint("Login failed: ", result.error)`;
+    }
+
+    function generateRefreshCode() {
+      return `# Refresh the access token
+# Called automatically by the SDK when token expires
+# You typically don't need to call this manually
+
+func _refresh_token():
+\tvar result = await Backend.auth_refresh()
+\t
+\tif result.ok:
+\t\tprint("Token refreshed successfully")
+\telse:
+\t\tprint("Token refresh failed: ", result.error)
+\t\t# User may need to login again`;
+    }
+
+    function generateLogoutCode() {
+      return `# Logout the current user
+# Clears stored tokens
+
+func _on_logout_pressed():
+\tvar result = await Backend.auth_logout()
+\t
+\tif result.ok:
+\t\tprint("Logged out successfully")
+\t\t# Redirect to login screen
+\telse:
+\t\tprint("Logout failed: ", result.error)`;
+    }
+
+    function generateKVGetCode(key) {
+      return `# Get a value from the Key-Value store
+# Each user has their own isolated KV storage
+
+func _load_player_data():
+\tvar key = "${key}"
+\t
+\tvar result = await Backend.kv_get(key)
+\t
+\tif result.ok:
+\t\tprint("Value: ", result.data.value)
+\t\tprint("Version: ", result.data.version)
+\t\treturn result.data.value
+\telse:
+\t\tif result.error_code == "not_found":
+\t\t\tprint("Key not found, using defaults")
+\t\t\treturn null
+\t\telse:
+\t\t\tprint("Failed to get value: ", result.error)
+\t\t\treturn null`;
+    }
+
+    function generateKVSetCode(key, body) {
+      let value = '{"score": 100, "level": 5}';
+      try {
+        const parsed = JSON.parse(body);
+        if (parsed.value !== undefined) {
+          value = JSON.stringify(parsed.value);
+        }
+      } catch {}
+      
+      return `# Set a value in the Key-Value store
+# Values are automatically versioned for conflict detection
+
+func _save_player_data():
+\tvar key = "${key}"
+\tvar value = ${jsonToGDScript(JSON.parse(value))}
+\t
+\t# Simple set (overwrites any existing value)
+\tvar result = await Backend.kv_set(key, value)
+\t
+\tif result.ok:
+\t\tprint("Saved successfully!")
+\t\tprint("New version: ", result.data.version)
+\telse:
+\t\tprint("Failed to save: ", result.error)
+
+
+# With optimistic locking (prevents overwriting newer data)
+func _save_player_data_safe(expected_version: int):
+\tvar key = "${key}"
+\tvar value = ${jsonToGDScript(JSON.parse(value))}
+\t
+\tvar result = await Backend.kv_set(key, value, expected_version)
+\t
+\tif result.ok:
+\t\tprint("Saved successfully!")
+\telif result.error_code == "conflict":
+\t\tprint("Version conflict! Someone else modified the data.")
+\t\t# Reload and retry
+\telse:
+\t\tprint("Failed to save: ", result.error)`;
+    }
+
+    function generateKVDeleteCode(key) {
+      return `# Delete a value from the Key-Value store
+
+func _delete_player_data():
+\tvar key = "${key}"
+\t
+\tvar result = await Backend.kv_delete(key)
+\t
+\tif result.ok:
+\t\tprint("Deleted successfully!")
+\telse:
+\t\tprint("Failed to delete: ", result.error)`;
+    }
+
+    function generateLeaderboardSubmitCode(board, body) {
+      let score = 1000;
+      try {
+        const parsed = JSON.parse(body);
+        score = parsed.score || score;
+      } catch {}
+      
+      return `# Submit a score to a leaderboard
+# Only the player's best score is kept
+
+func _submit_score():
+\tvar board_name = "${board}"
+\tvar score = ${score}
+\t
+\tvar result = await Backend.leaderboard_submit(board_name, score)
+\t
+\tif result.ok:
+\t\tprint("Score submitted!")
+\t\tprint("Your best score: ", result.data.best_score)
+\t\tprint("Your rank: #", result.data.rank)
+\telse:
+\t\tprint("Failed to submit score: ", result.error)
+
+
+# Submit score after completing a level
+func _on_level_complete(level_score: int):
+\tawait Backend.leaderboard_submit("${board}", level_score)`;
+    }
+
+    function generateLeaderboardTopCode(board, limit) {
+      return `# Get the top scores from a leaderboard
+
+func _load_leaderboard():
+\tvar board_name = "${board}"
+\tvar limit = ${limit}  # Max 100
+\t
+\tvar result = await Backend.leaderboard_top(board_name, limit)
+\t
+\tif result.ok:
+\t\tprint("Top ", limit, " scores:")
+\t\tfor entry in result.data.entries:
+\t\t\tprint("#", entry.rank, " - ", entry.user_id, ": ", entry.score)
+\t\treturn result.data.entries
+\telse:
+\t\tprint("Failed to load leaderboard: ", result.error)
+\t\treturn []
+
+
+# Display leaderboard in UI
+func _display_leaderboard():
+\tvar entries = await _load_leaderboard()
+\tfor i in range(entries.size()):
+\t\tvar entry = entries[i]
+\t\t# Update your UI here
+\t\t# leaderboard_ui.add_entry(entry.rank, entry.user_id, entry.score)`;
+    }
+
+    function generateLeaderboardMeCode(board) {
+      return `# Get the current user's rank on a leaderboard
+
+func _get_my_rank():
+\tvar board_name = "${board}"
+\t
+\tvar result = await Backend.leaderboard_me(board_name)
+\t
+\tif result.ok:
+\t\tprint("Your score: ", result.data.score)
+\t\tprint("Your rank: #", result.data.rank)
+\t\treturn result.data
+\telse:
+\t\tif result.error_code == "not_found":
+\t\t\tprint("You haven't submitted a score yet")
+\t\telse:
+\t\t\tprint("Failed to get rank: ", result.error)
+\t\treturn null`;
+    }
+
+    function generateConfigCode(params) {
+      const platform = params.platform || 'windows';
+      const version = params.app_version || '1.0.0';
+      
+      return `# Get remote configuration
+# Use this for feature flags, maintenance mode, etc.
+
+func _load_remote_config():
+\tvar platform = "${platform}"  # windows, linux, macos, android, ios, web
+\tvar app_version = "${version}"
+\t
+\tvar result = await Backend.get_config(platform, app_version)
+\t
+\tif result.ok:
+\t\tvar config = result.data.config
+\t\tvar flags = result.data.flags
+\t\t
+\t\t# Check maintenance mode
+\t\tif config.get("maintenance_mode", false):
+\t\t\tprint("Server is in maintenance mode!")
+\t\t\treturn
+\t\t
+\t\t# Check minimum version
+\t\tvar min_version = config.get("min_version", "1.0.0")
+\t\tif _compare_versions(app_version, min_version) < 0:
+\t\t\tprint("Please update your game!")
+\t\t\treturn
+\t\t
+\t\t# Use feature flags
+\t\tif flags.get("new_ui_enabled", false):
+\t\t\tprint("New UI is enabled!")
+\t\t
+\t\treturn result.data
+\telse:
+\t\tprint("Failed to load config: ", result.error)
+\t\treturn null`;
+    }
+
+    function generateHealthCode() {
+      return `# Check if the server is running
+# Useful for connection status indicators
+
+func _check_server_health():
+\tvar http = HTTPRequest.new()
+\tadd_child(http)
+\t
+\tvar error = http.request(Backend.base_url + "/health")
+\tif error != OK:
+\t\tprint("Server unreachable")
+\t\treturn false
+\t
+\tvar response = await http.request_completed
+\thttp.queue_free()
+\t
+\tvar status_code = response[1]
+\tif status_code == 200:
+\t\tprint("Server is healthy!")
+\t\treturn true
+\telse:
+\t\tprint("Server returned error: ", status_code)
+\t\treturn false`;
+    }
+
+    function generateGenericCode(method, url, useAuth, bodyDict) {
+      const hasBody = ['POST', 'PUT', 'PATCH'].includes(method) && bodyDict;
+      
+      return `# Generic ${method} request to ${url}
+# Using the Backend SDK's HTTP client
+
+func _make_request():
+\tvar url = "${url}"
+${hasBody ? `\tvar body = ${bodyDict || '{}'}` : ''}
+\t
+\t# Make the request
+\tvar result = await Backend._http.request(
+\t\t"${method}",
+\t\turl,
+${hasBody ? '\t\tbody,\n' : '\t\t{},\n'}\t\t${useAuth ? 'true' : 'false'}  # ${useAuth ? 'Include' : 'Exclude'} auth token
+\t)
+\t
+\tif result.ok:
+\t\tprint("Success: ", result.data)
+\t\treturn result.data
+\telse:
+\t\tprint("Error: ", result.error)
+\t\treturn null`;
+    }
+
+    function highlightGDScript(code) {
+      // First escape HTML
+      let result = code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      
+      // Process line by line to handle comments properly
+      const lines = result.split('\n');
+      const highlighted = lines.map(line => {
+        // Handle comments first (entire rest of line after #)
+        const commentIdx = line.indexOf('#');
+        let codePart = line;
+        let commentPart = '';
+        
+        if (commentIdx !== -1) {
+          codePart = line.substring(0, commentIdx);
+          commentPart = '<span class="comment">' + line.substring(commentIdx) + '</span>';
+        }
+        
+        // Highlight strings in code part (be careful not to match inside already-highlighted parts)
+        codePart = codePart.replace(/"([^"]*)"/g, '§STR§"$1"§/STR§');
+        
+        // Highlight keywords
+        const keywords = ['func', 'var', 'const', 'if', 'else', 'elif', 'for', 'while', 'return', 'await', 'and', 'or', 'not', 'in', 'true', 'false', 'null', 'self', 'class_name', 'extends', 'signal', 'enum'];
+        keywords.forEach(kw => {
+          const regex = new RegExp('\\b(' + kw + ')\\b', 'g');
+          codePart = codePart.replace(regex, '§KW§$1§/KW§');
+        });
+        
+        // Highlight numbers
+        codePart = codePart.replace(/\b(\d+\.?\d*)\b/g, '§NUM§$1§/NUM§');
+        
+        // Highlight built-in functions
+        const funcs = ['Backend', 'HTTPRequest', 'OK', 'print', 'add_child', 'queue_free', 'size', 'range'];
+        funcs.forEach(fn => {
+          const regex = new RegExp('\\b(' + fn + ')\\b', 'g');
+          codePart = codePart.replace(regex, '§FN§$1§/FN§');
+        });
+        
+        // Now convert placeholders to actual HTML spans
+        codePart = codePart
+          .replace(/§STR§/g, '<span class="string">')
+          .replace(/§\/STR§/g, '</span>')
+          .replace(/§KW§/g, '<span class="keyword">')
+          .replace(/§\/KW§/g, '</span>')
+          .replace(/§NUM§/g, '<span class="number">')
+          .replace(/§\/NUM§/g, '</span>')
+          .replace(/§FN§/g, '<span class="function">')
+          .replace(/§\/FN§/g, '</span>');
+        
+        return codePart + commentPart;
+      });
+      
+      return highlighted.join('\n');
+    }
+
+    // Initialize
+    (async () => {
+      const admin = await initPage('endpoints');
+      if (!admin) return;
+      
+      document.getElementById('sidebar').innerHTML = getSidebarHTML('endpoints');
+      loadEndpoints();
+    })();
+  </script>
+</body>
+</html>
+
